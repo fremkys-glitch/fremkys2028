@@ -40,7 +40,7 @@ interface ShopContextType {
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
 const PRODUCTS_CACHE_KEY = 'fremkys_products_cache_v2';
-const SETTINGS_CACHE_KEY = 'fremkys_settings_cache_v2';
+const SETTINGS_CACHE_KEY = 'fremkys_settings_cache_v3';
 
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currency, setCurrency] = useState<Currency>('DZD');

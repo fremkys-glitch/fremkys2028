@@ -27,7 +27,7 @@ export interface SiteSettings {
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   id: 'main',
-  hero_image: '/images/hero_clean.webp',
+  hero_image: 'https://res.cloudinary.com/dpek3p0ot/video/upload/q_auto,w_720,c_limit/v1793636979/IMG_6165_yijywn.mp4',
   hero_title: 'Nouvelle Collection',
   hero_subtitle: 'Édition Limitée · Printemps 2026',
   dual_left_image: '/images/dual_feature_left.webp',
@@ -46,7 +46,7 @@ export function isVideoMedia(url?: string): boolean {
 
 // Generate an optimal poster image for a video URL
 export function getVideoPosterUrl(url?: string): string {
-  if (!url) return '/images/hero_clean.webp';
+  if (!url) return 'https://res.cloudinary.com/dpek3p0ot/video/upload/q_auto:eco,w_1200,c_limit,f_auto/v1793636979/IMG_6165_yijywn.jpg';
   if (url.includes('res.cloudinary.com') && url.includes('/video/upload/')) {
     // Cloudinary dynamic frame extraction as lightweight webp/jpg poster
     return url

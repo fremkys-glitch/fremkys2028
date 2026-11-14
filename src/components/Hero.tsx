@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { isVideoMedia, getVideoPosterUrl, getOptimizedImageUrl } from '../lib/supabase';
@@ -11,6 +11,7 @@ export const Hero: React.FC<HeroProps> = ({ onExplore }) => {
   const { siteSettings } = useShop();
   const [isLoaded, setIsLoaded] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -36,11 +37,57 @@ export const Hero: React.FC<HeroProps> = ({ onExplore }) => {
     };
   }, []);
 
-  const currentHeroImg = siteSettings?.hero_image || '/images/hero_clean.webp';
+  const currentHeroImg = siteSettings?.hero_image || 'https://res.cloudinary.com/dpek3p0ot/video/upload/q_auto,w_720,c_limit/v1793636979/IMG_6165_yijywn.mp4';
   const heroTitle = siteSettings?.hero_title || 'Nouvelle Collection';
   const heroSubtitle = siteSettings?.hero_subtitle || 'Classic & timeless';
   const isVideo = isVideoMedia(currentHeroImg);
-  const posterUrl = isVideo ? getVideoPosterUrl(currentHeroImg) : getOptimizedImageUrl(currentHeroImg, { width: 1600, quality: 78 });
+  const posterUrl = isVideo ? getVideoPosterUrl(currentHeroImg) : '';
+
+  // Mobile Autoplay Enforcer: Ensures video starts on iOS Safari & Android Chrome
+  useEffect(() => {
+    if (!isVideo) return;
+    const vid = videoRef.current;
+    if (!vid) return;
+
+    // Direct DOM property enforcement required by iOS WebKit
+    vid.defaultMuted = true;
+    vid.muted = true;
+    vid.setAttribute('playsinline', '');
+    vid.setAttribute('webkit-playsinline', 'true');
+
+    const startPlayback = () => {
+      if (vid) {
+        const promise = vid.play();
+        if (promise !== undefined) {
+          promise.catch(() => {
+            // Autoplay blocked by mobile battery saver / low-power mode
+          });
+        }
+      }
+    };
+
+    startPlayback();
+
+    // In case mobile device has Low Power Mode active, play on first touch or scroll
+    const handleFirstInteraction = () => {
+      if (vid && vid.paused) {
+        vid.play().catch(() => {});
+      }
+      window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener('scroll', handleFirstInteraction);
+      window.removeEventListener('click', handleFirstInteraction);
+    };
+
+    window.addEventListener('touchstart', handleFirstInteraction, { passive: true });
+    window.addEventListener('scroll', handleFirstInteraction, { passive: true });
+    window.addEventListener('click', handleFirstInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener('scroll', handleFirstInteraction);
+      window.removeEventListener('click', handleFirstInteraction);
+    };
+  }, [isVideo, currentHeroImg]);
 
   const titleWords = heroTitle.split(' ').map((word, idx) => ({
     word,
@@ -60,10 +107,14 @@ export const Hero: React.FC<HeroProps> = ({ onExplore }) => {
       <div
         className="absolute inset-0 w-full h-full pointer-events-none transition-[clip-path] duration-[1400ms] ease-[cubic-bezier(0.19,1,0.22,1)]"
         style={{
-          clipPath: isLoaded
+          clipPath: isMobile
+            ? 'none'
+            : isLoaded
             ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
             : 'polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%)',
-          WebkitClipPath: isLoaded
+          WebkitClipPath: isMobile
+            ? 'none'
+            : isLoaded
             ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
             : 'polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%)',
           transform: isMobile ? 'none' : `translate3d(0, ${imageParallax}px, 0)`,
@@ -71,59 +122,33 @@ export const Hero: React.FC<HeroProps> = ({ onExplore }) => {
         }}
       >
         {isVideo ? (
-          <>
-            {/* Mobile Fallback: Fast, low-bandwidth static poster image instead of streaming video */}
-            <div className="w-full h-full block md:hidden">
-              <img
-                src={posterUrl}
-                alt="FREMKYS Nouvelle Collection"
-                fetchPriority="high"
-                decoding="async"
-                width={720}
-                height={1080}
-                className="w-full h-full object-cover object-center"
-              />
-            </div>
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            {/* Ambient Background Layer */}
+            <div
+              className="absolute inset-0 w-full h-full bg-cover bg-center filter blur-3xl opacity-35 scale-125 pointer-events-none hidden md:block"
+              style={{ backgroundImage: `url(${posterUrl})` }}
+            />
 
-            {/* Desktop / Tablet: Single Video stream with poster and metadata preload */}
-            <div className="relative w-full h-full hidden md:flex items-center justify-center overflow-hidden">
-              {/* Lightweight CSS ambient background atmosphere (no duplicate video stream) */}
-              <div
-                className="absolute inset-0 w-full h-full bg-cover bg-center filter blur-3xl opacity-35 scale-125 pointer-events-none"
-                style={{ backgroundImage: `url(${posterUrl})` }}
-              />
-
-              {/* Crisp Center Video: Perfectly framed on laptop/desktop */}
-              <video
-                src={currentHeroImg}
-                poster={posterUrl}
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="metadata"
-                width={760}
-                height={1080}
-                className="relative w-full h-full md:w-auto md:max-w-[640px] lg:max-w-[760px] xl:max-w-[860px] object-cover object-center md:object-[center_12%] transition-transform duration-[1800ms] ease-[cubic-bezier(0.19,1,0.22,1)]"
-                style={{
-                  transform: isLoaded ? 'scale(1)' : 'scale(1.04)',
-                }}
-              />
-            </div>
-          </>
+            {/* Crisp Center Video: Plays smoothly and instantly on all devices */}
+            <video
+              ref={videoRef}
+              src={currentHeroImg}
+              poster={posterUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              className="relative w-full h-full md:w-auto md:max-w-[640px] lg:max-w-[760px] xl:max-w-[860px] object-cover object-center md:object-[center_12%] transition-transform duration-[1800ms] ease-[cubic-bezier(0.19,1,0.22,1)]"
+              style={{
+                transform: isLoaded ? 'scale(1)' : 'scale(1.04)',
+              }}
+            >
+              <source src={currentHeroImg} type="video/mp4" />
+            </video>
+          </div>
         ) : (
-          <img
-            src={posterUrl}
-            alt="FREMKYS Nouvelle Collection"
-            fetchPriority="high"
-            decoding="async"
-            width={1600}
-            height={900}
-            className="w-full h-full object-cover object-center md:object-[center_20%] transition-transform duration-[1800ms] ease-[cubic-bezier(0.19,1,0.22,1)]"
-            style={{
-              transform: isLoaded ? 'scale(1)' : 'scale(1.08)',
-            }}
-          />
+          <div className="w-full h-full bg-[#1A1615]" />
         )}
 
         {/* Subtle cinematic gradient overlays */}
